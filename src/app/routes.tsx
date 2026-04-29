@@ -16,4 +16,6 @@ export const router = createBrowserRouter([
     path: "/sliply/property/:propertyId",
     Component: PropertyPayments,
   },
-]);
+], {
+  basename: "/BelongSliply", // <--- AÑADE ESTA LÍNEA AQUÍ
+});
