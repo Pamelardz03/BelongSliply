@@ -100,6 +100,7 @@ export function PropertyPayments() {
   const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
   const [formCategory, setFormCategory] = useState('');
   const [formStartDate, setFormStartDate] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState<string | number>('');
   const [formEndDate, setFormEndDate] = useState('');
   const [formFrequency, setFormFrequency] = useState('');
   const [equalDistribution, setEqualDistribution] = useState(true);
@@ -948,26 +949,42 @@ export function PropertyPayments() {
                     selectedDate={formStartDate}
                     onDateSelect={(date) => setFormStartDate(date)}
                     label="Fecha Inicio:"
-                    minDate={(() => {
-                      const oneMonthAgo = new Date();
-                      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                      return oneMonthAgo;
-                    })()}
+                    minDate={new Date()}
                   />
                   <DatePicker
                     selectedDate={formEndDate}
                     onDateSelect={(date) => setFormEndDate(date)}
                     label="Fecha Fin:"
-                    minDate={(() => {
-                      const oneMonthAgo = new Date();
-                      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                      return oneMonthAgo;
-                    })()}
+                    minDate={formStartDate ? new Date(formStartDate) : new Date()}
                   />
                 </div>
 
+                {/* Monto del Pago (Nueva sección) */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad a cobrar:
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500 font-medium">$</span>
+                    <input
+                      type="number"
+                      value={paymentAmount} // Asegúrate de declarar este estado: const [paymentAmount, setPaymentAmount] = useState('');
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-3 py-2 border-2 border-gray-300 rounded-lg focus:border-[#8B1538] outline-none text-sm transition-colors font-medium"
+                    />
+                  </div>
+                  {/* Leyenda aclaratoria dinámica */}
+                  <p className="text-[10px] text-gray-500 mt-1 italic">
+                    {paymentAmount && formFrequency
+                      ? `Definiendo un cobro de $${paymentAmount} con frecuencia ${formFrequency.toLowerCase()}.`
+                      : "Define la cantidad y frecuencia para el cálculo de cobros."
+                    }
+                  </p>
+                </div>
+
                 {/* Frecuencia */}
-                <div>
+                <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Frecuencia:</label>
                   <select
                     value={formFrequency}
