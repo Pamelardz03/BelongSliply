@@ -24,8 +24,8 @@ interface Payment {
   dueDate: string;
   roomies: Roomie[];
   status: 'proximos' | 'completados' | 'atrasados';
-  totalAmount?: number;   // monto total del pago
-  frequency?: string;     // frecuencia (Mensual, Semanal, etc.)
+  totalAmount?: number;
+  frequency?: string;
 }
 
 const initialPaymentsData: Payment[] = [
@@ -327,7 +327,7 @@ export function PropertyPayments() {
   };
 
   const saveNewPayment = () => {
-    const amount = parseFloat(paymentAmount) || 0;
+    const totalAmount = parseFloat(paymentAmount) || 0;
     const newRoomies: Roomie[] = selectedResponsibles.map(responsibleId => {
       const person = registeredPeople.find(p => p.id === responsibleId);
       return {
@@ -344,8 +344,7 @@ export function PropertyPayments() {
       dueDate: formStartDate ? new Date(formStartDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
       roomies: newRoomies,
       status: 'proximos',
-      totalAmount: amount,
-      frequency: formFrequency,
+      totalAmount: parseFloat(paymentAmount) || undefined,
     };
 
     setPayments(prevPayments => [...prevPayments, newPayment]);
@@ -357,8 +356,7 @@ export function PropertyPayments() {
 
   const confirmEditPayment = (editType: 'once' | 'all') => {
     if (editingPaymentId !== null) {
-      const amount = parseFloat(paymentAmount) || 0;
-      // Modo edición: actualizar el pago existente
+      const totalAmount = parseFloat(paymentAmount) || 0;
       setPayments(prevPayments =>
         prevPayments.map(payment => {
           if (payment.id === editingPaymentId) {
@@ -380,7 +378,7 @@ export function PropertyPayments() {
               name: formName,
               category: formCategory,
               roomies: updatedRoomies,
-              totalAmount: amount,
+              totalAmount: totalAmount,
               frequency: formFrequency,
             };
           }
@@ -422,7 +420,7 @@ export function PropertyPayments() {
   };
 
   const getRoomieAmount = (payment: Payment, roomie: Roomie): string => {
-    if (!payment.totalAmount || payment.totalAmount === 0) return '';
+    if (!payment.totalAmount) return '';
     const pct = roomie.percentage ?? (100 / (payment.roomies.length || 1));
     const amount = (payment.totalAmount * pct) / 100;
     return `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -707,15 +705,14 @@ export function PropertyPayments() {
                     </div>
                     <p className="text-sm text-[#8B1538] mt-0.5">{payment.category}</p>
                     <p className="text-xs text-gray-500 mt-1">Fecha Límite: {payment.dueDate}</p>
-                    {/* Monto: propietario ve total, roomie ve su parte */}
                     {payment.totalAmount ? (
                       <p className="text-sm font-semibold text-gray-800 mt-1">
                         {userType === 'propietario'
                           ? `$${payment.totalAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payment.frequency ? `/ ${payment.frequency}` : ''}`
                           : (() => {
-                              const myRoomie = payment.roomies.find(r => r.name === userName);
-                              return myRoomie ? `${getRoomieAmount(payment, myRoomie)} ${payment.frequency ? `/ ${payment.frequency}` : ''}` : '';
-                            })()
+                            const myRoomie = payment.roomies.find(r => r.name === userName);
+                            return myRoomie ? `${getRoomieAmount(payment, myRoomie)} ${payment.frequency ? `/ ${payment.frequency}` : ''}` : '';
+                          })()
                         }
                       </p>
                     ) : null}
@@ -792,6 +789,12 @@ export function PropertyPayments() {
               <div>
                 <h2 className="font-bold text-lg text-gray-900">{selectedPayment.name}</h2>
                 <p className="text-sm text-[#8B1538]">{selectedPayment.category}</p>
+                {selectedPayment.totalAmount && (
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    ${Number(selectedPayment.totalAmount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    <span className="text-xs font-normal text-gray-400 ml-1">MXN total</span>
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setSelectedPayment(null)}
@@ -986,8 +989,6 @@ export function PropertyPayments() {
                   )}
                 </div>
 
-
-
                 {/* Fechas */}
                 <div className="grid grid-cols-2 gap-3">
                   <DatePicker
@@ -1012,28 +1013,13 @@ export function PropertyPayments() {
                   />
                 </div>
 
-                {/* Frecuencia */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Frecuencia:</label>
-                  <select
-                    value={formFrequency}
-                    onChange={(e) => setFormFrequency(e.target.value)}
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-[#8B1538] outline-none text-sm transition-colors"
-                  >
-                    <option value="">Seleccionar frecuencia</option>
-                    {frequencies.map(frequency => (
-                      <option key={frequency} value={frequency}>{frequency}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Monto del Pago */}
+                {/* Monto del Pago con Icono 💵 */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cantidad a cobrar:
+                    Cantidad Total a Cobrar:
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">💵</span> {/* Icono de monto para consistencia con el de abajo */}
+                    <span className="text-2xl">💵</span>
                     <div className="relative flex-1">
                       <span className="absolute left-3 top-2 text-gray-500 font-medium">$</span>
                       <input
@@ -1047,12 +1033,27 @@ export function PropertyPayments() {
                   </div>
                   <p className="text-[10px] text-gray-500 mt-1 italic">
                     {paymentAmount && formFrequency
-                      ? `Cobro de $${paymentAmount} ${formFrequency.toLowerCase()}`
-                      : "Define el monto por cada periodo."
-                    }
+                      ? `Cobro total de $${paymentAmount} ${formFrequency.toLowerCase()}`
+                      : "Define el monto total que se dividirá entre los responsables."}
                   </p>
                 </div>
 
+                {/* Frecuencia */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Frecuencia:</label>
+                  <select
+                    value={formFrequency}
+                    onChange={(e) => setFormFrequency(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-[#8B1538] outline-none text-sm transition-colors"
+                  >
+                    <option value="">Seleccionar frecuencia</option>
+                    {frequencies.map(frequency => (
+                      <option key={frequency} value={frequency}>{frequency}</option>
+                    ))}
+                  </select>
+                </div>
+
+              
                 {/* Método de Pago */}
                 <div className="border-t pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago (Propietario):</label>
@@ -1151,401 +1152,422 @@ export function PropertyPayments() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div >
+      )
+      }
 
       {/* Edit Confirmation Modal */}
-      {showEditConfirmation && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
-            <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres editar este pago?</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Este es un pago recurrente. Elige si quieres modificar solo esta vez o todas las futuras.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => confirmEditPayment('once')}
-                className="w-full px-4 py-3 border-2 border-[#8B1538] text-[#8B1538] rounded-lg font-medium hover:bg-[#8B1538] hover:text-white transition-colors"
-              >
-                Solo esta vez
-              </button>
-              <button
-                onClick={() => confirmEditPayment('all')}
-                className="w-full px-4 py-3 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
-              >
-                Esta y futuras
-              </button>
-              <button
-                onClick={() => setShowEditConfirmation(false)}
-                className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmation && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
-            {isEditMode && formFrequency !== 'Único' && formFrequency !== '' ? (
-              // Modal para pagos recurrentes
-              <>
-                <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres eliminar este pago?</h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  Este es un pago recurrente. Elige si quieres eliminar solo esta ocurrencia o todas.
-                </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => confirmDeleteFromForm('once')}
-                    className="w-full px-4 py-3 border-2 border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-600 hover:text-white transition-colors"
-                  >
-                    Solo esta vez
-                  </button>
-                  <button
-                    onClick={() => confirmDeleteFromForm('all')}
-                    className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-                  >
-                    Todas
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirmation(false)}
-                    className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </>
-            ) : (
-              // Modal para pagos únicos o sin frecuencia
-              <>
-                <h3 className="font-bold text-lg text-gray-900 mb-2">¿Estás seguro?</h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  {isEditMode
-                    ? 'Este pago será eliminado permanentemente. Esta acción no se puede deshacer.'
-                    : 'El pago no se ha guardado. Si eliminas, se perderán todos los datos ingresados.'
-                  }
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDeleteConfirmation(false)}
-                    className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleDeletePayment}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-                  >
-                    {isEditMode ? 'Eliminar' : 'Aceptar'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Delete from List Confirmation Modal */}
-      {showDeleteListConfirmation && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
-            <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres eliminar este pago?</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Este es un pago recurrente. Elige si quieres eliminar solo esta ocurrencia o todas.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => confirmDeletePayment('once')}
-                className="w-full px-4 py-3 border-2 border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-600 hover:text-white transition-colors"
-              >
-                Solo esta vez
-              </button>
-              <button
-                onClick={() => confirmDeletePayment('all')}
-                className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => {
-                  setShowDeleteListConfirmation(false);
-                  setDeletingPaymentId(null);
-                  // NO cerrar el swipe, mantenerlo abierto
-                }}
-                className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Modal - Confirmación simple */}
-      {showPaymentModal && selectedRoomie && selectedPayment && !showCheckoutModal && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
-            <h3 className="font-bold text-lg text-gray-900 mb-2">Realizar Pago</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              ¿Confirmar pago para <span className="font-semibold text-gray-900">{selectedRoomie.name}</span>?
-            </p>
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Pago:</span>
-                <span className="text-sm font-medium text-gray-900">{selectedPayment.name}</span>
-              </div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Categoría:</span>
-                <span className="text-sm font-medium text-[#8B1538]">{selectedPayment.category}</span>
-              </div>
-              {selectedPayment.totalAmount ? (
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Tu parte:</span>
-                  <span className="text-sm font-bold text-[#8B1538]">
-                    {getRoomieAmount(selectedPayment, selectedRoomie)}
-                    {selectedRoomie.percentage !== undefined ? ` (${selectedRoomie.percentage}%)` : ''}
-                  </span>
-                </div>
-              ) : null}
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Fecha límite:</span>
-                <span className="text-sm font-medium text-gray-900">{selectedPayment.dueDate}</span>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setShowPaymentModal(false); setSelectedRoomie(null); }}
-                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => setShowCheckoutModal(true)}
-                className="flex-1 px-4 py-2 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal - Pago Único / Programado */}
-      {showCheckoutModal && selectedRoomie && selectedPayment && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[70]">
-          <div className="bg-white rounded-2xl w-[340px] max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
-
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <div>
-                <h2 className="font-bold text-lg text-gray-900">{selectedPayment.name}</h2>
-                <p className="text-sm text-[#8B1538]">{selectedPayment.category}</p>
-                {selectedPayment.totalAmount ? (
-                  <p className="text-base font-bold text-gray-900 mt-0.5">
-                    {getRoomieAmount(selectedPayment, selectedRoomie)}
-                  </p>
-                ) : null}
-              </div>
-              <button onClick={closeCheckout} className="p-1 hover:bg-gray-100 rounded-full">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            {showPaymentSuccess ? (
-              <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">¡Pago Completado!</h3>
-                <p className="text-sm text-gray-500 mb-1">{selectedPayment.name}</p>
-                <p className="text-xs text-gray-400 mb-6">
-                  {paymentTab === 'programado' ? 'Pago programado exitosamente' : 'Pago único realizado'}
-                </p>
+      {
+        showEditConfirmation && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
+              <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres editar este pago?</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Este es un pago recurrente. Elige si quieres modificar solo esta vez o todas las futuras.
+              </p>
+              <div className="flex flex-col gap-3">
                 <button
-                  onClick={closeCheckout}
-                  className="px-8 py-2.5 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
+                  onClick={() => confirmEditPayment('once')}
+                  className="w-full px-4 py-3 border-2 border-[#8B1538] text-[#8B1538] rounded-lg font-medium hover:bg-[#8B1538] hover:text-white transition-colors"
                 >
-                  Listo
+                  Solo esta vez
+                </button>
+                <button
+                  onClick={() => confirmEditPayment('all')}
+                  className="w-full px-4 py-3 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
+                >
+                  Esta y futuras
+                </button>
+                <button
+                  onClick={() => setShowEditConfirmation(false)}
+                  className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
+                >
+                  Cancelar
                 </button>
               </div>
-            ) : (
-              <>
-                <div className="flex border-b border-gray-200">
-                  <button
-                    onClick={() => setPaymentTab('unico')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors ${paymentTab === 'unico'
-                      ? 'text-[#8B1538] border-b-2 border-[#8B1538]'
-                      : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                  >
-                    Pago Único
-                  </button>
-                  <button
-                    onClick={() => setPaymentTab('programado')}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors ${paymentTab === 'programado'
-                      ? 'text-[#8B1538] border-b-2 border-[#8B1538]'
-                      : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                  >
-                    Pago Programado
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                  {paymentTab === 'unico' ? (
-                    <>
-                      <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                        <span className="text-gray-500">Fecha del pago: </span>
-                        <span className="font-medium text-gray-900">{selectedPayment.dueDate}</span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Número de tarjeta</label>
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => {
-                            const v = e.target.value.replace(/\D/g, '').slice(0, 16);
-                            setCardNumber(v.replace(/(.{4})/g, '$1 ').trim());
-                          }}
-                          placeholder="1234 5678 9012 3456"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Nombre en tarjeta</label>
-                        <input
-                          type="text"
-                          value={cardName}
-                          onChange={(e) => setCardName(e.target.value)}
-                          placeholder="JUAN PÉREZ"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Vencimiento</label>
-                          <input
-                            type="text"
-                            value={cardExpiry}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              setCardExpiry(v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v);
-                            }}
-                            placeholder="MM/AA"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">CVV</label>
-                          <input
-                            type="password"
-                            value={cardCVV}
-                            onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                            placeholder="•••"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-400 text-center">Checkout de confirmación</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="bg-gray-50 rounded-lg p-3 text-sm flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-[#8B1538]" />
-                        <span className="text-gray-500">Inicio: </span>
-                        <span className="font-medium text-gray-900">{selectedPayment.dueDate}</span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Frecuencia</label>
-                        <div className="px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-700 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-[#8B1538] inline-block"></span>
-                          Bimestral
-                          <span className="text-xs text-gray-400">(del pago)</span>
-                        </div>
-                      </div>
-                      <DatePicker
-                        selectedDate={scheduledEndDate}
-                        onDateSelect={(date) => setScheduledEndDate(date)}
-                        label="Hasta cuándo pagar"
-                        minDate={new Date()}
-                      />
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Número de tarjeta</label>
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => {
-                            const v = e.target.value.replace(/\D/g, '').slice(0, 16);
-                            setCardNumber(v.replace(/(.{4})/g, '$1 ').trim());
-                          }}
-                          placeholder="1234 5678 9012 3456"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Vencimiento</label>
-                          <input
-                            type="text"
-                            value={cardExpiry}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              setCardExpiry(v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v);
-                            }}
-                            placeholder="MM/AA"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">CVV</label>
-                          <input
-                            type="password"
-                            value={cardCVV}
-                            onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                            placeholder="•••"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-400 text-center">Checkout de confirmación</p>
-                    </>
-                  )}
-                </div>
-
-                <div className="px-6 py-4 border-t border-gray-100">
-                  <button
-                    onClick={confirmPayment}
-                    disabled={!cardNumber || !cardExpiry || !cardCVV || (paymentTab === 'programado' && !scheduledEndDate)}
-                    className="w-full py-3 bg-[#8B1538] text-white rounded-xl font-semibold hover:bg-[#6b0f2a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Completar
-                  </button>
-                </div>
-              </>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
+
+      {/* Delete Confirmation Modal */}
+      {
+        showDeleteConfirmation && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
+              {isEditMode && formFrequency !== 'Único' && formFrequency !== '' ? (
+                // Modal para pagos recurrentes
+                <>
+                  <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres eliminar este pago?</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    Este es un pago recurrente. Elige si quieres eliminar solo esta ocurrencia o todas.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => confirmDeleteFromForm('once')}
+                      className="w-full px-4 py-3 border-2 border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                      Solo esta vez
+                    </button>
+                    <button
+                      onClick={() => confirmDeleteFromForm('all')}
+                      className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      Todas
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirmation(false)}
+                      className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // Modal para pagos únicos o sin frecuencia
+                <>
+                  <h3 className="font-bold text-lg text-gray-900 mb-2">¿Estás seguro?</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    {isEditMode
+                      ? 'Este pago será eliminado permanentemente. Esta acción no se puede deshacer.'
+                      : 'El pago no se ha guardado. Si eliminas, se perderán todos los datos ingresados.'
+                    }
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowDeleteConfirmation(false)}
+                      className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleDeletePayment}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      {isEditMode ? 'Eliminar' : 'Aceptar'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Delete from List Confirmation Modal */}
+      {
+        showDeleteListConfirmation && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
+              <h3 className="font-bold text-lg text-gray-900 mb-2">¿Cómo quieres eliminar este pago?</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Este es un pago recurrente. Elige si quieres eliminar solo esta ocurrencia o todas.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => confirmDeletePayment('once')}
+                  className="w-full px-4 py-3 border-2 border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-600 hover:text-white transition-colors"
+                >
+                  Solo esta vez
+                </button>
+                <button
+                  onClick={() => confirmDeletePayment('all')}
+                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteListConfirmation(false);
+                    setDeletingPaymentId(null);
+                    // NO cerrar el swipe, mantenerlo abierto
+                  }}
+                  className="w-full px-4 py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Payment Modal - Confirmación simple */}
+      {
+        showPaymentModal && selectedRoomie && selectedPayment && !showCheckoutModal && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl w-[320px] p-6 shadow-xl">
+              <h3 className="font-bold text-lg text-gray-900 mb-2">Realizar Pago</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                ¿Confirmar pago para <span className="font-semibold text-gray-900">{selectedRoomie.name}</span>?
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Pago:</span>
+                  <span className="text-sm font-medium text-gray-900">{selectedPayment.name}</span>
+                </div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Categoría:</span>
+                  <span className="text-sm font-medium text-[#8B1538]">{selectedPayment.category}</span>
+                </div>
+                {selectedPayment.totalAmount ? (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Tu parte:</span>
+                    <span className="text-sm font-bold text-[#8B1538]">
+                      {getRoomieAmount(selectedPayment, selectedRoomie)}
+                      {selectedRoomie.percentage !== undefined ? ` (${selectedRoomie.percentage}%)` : ''}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Fecha límite:</span>
+                  <span className="text-sm font-medium text-gray-900">{selectedPayment.dueDate}</span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowPaymentModal(false); setSelectedRoomie(null); }}
+                  className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => setShowCheckoutModal(true)}
+                  className="flex-1 px-4 py-2 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Checkout Modal - Pago Único / Programado */}
+      {
+        showCheckoutModal && selectedRoomie && selectedPayment && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[70]">
+            <div className="bg-white rounded-2xl w-[340px] max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
+
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-lg text-gray-900">{selectedPayment.name}</h2>
+                  <p className="text-sm text-[#8B1538]">{selectedPayment.category}</p>
+                  {selectedPayment.totalAmount ? (
+                    <p className="text-base font-bold text-gray-900 mt-0.5">
+                      {getRoomieAmount(selectedPayment, selectedRoomie)}
+                    </p>
+                  ) : null}
+                </div>
+                <button onClick={closeCheckout} className="p-1 hover:bg-gray-100 rounded-full">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {showPaymentSuccess ? (
+                <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 text-center">
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">¡Pago Completado!</h3>
+                  <p className="text-sm text-gray-500 mb-1">{selectedPayment.name}</p>
+                  <p className="text-xs text-gray-400 mb-6">
+                    {paymentTab === 'programado' ? 'Pago programado exitosamente' : 'Pago único realizado'}
+                  </p>
+                  <button
+                    onClick={closeCheckout}
+                    className="px-8 py-2.5 bg-[#8B1538] text-white rounded-lg font-medium hover:bg-[#6b0f2a] transition-colors"
+                  >
+                    Listo
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex border-b border-gray-200">
+                    <button
+                      onClick={() => setPaymentTab('unico')}
+                      className={`flex-1 py-3 text-sm font-medium transition-colors ${paymentTab === 'unico'
+                        ? 'text-[#8B1538] border-b-2 border-[#8B1538]'
+                        : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                      Pago Único
+                    </button>
+                    <button
+                      onClick={() => setPaymentTab('programado')}
+                      className={`flex-1 py-3 text-sm font-medium transition-colors ${paymentTab === 'programado'
+                        ? 'text-[#8B1538] border-b-2 border-[#8B1538]'
+                        : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                      Pago Programado
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                    {paymentTab === 'unico' ? (
+                      <>
+                        <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                          <span className="text-gray-500">Fecha del pago: </span>
+                          <span className="font-medium text-gray-900">{selectedPayment.dueDate}</span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Número de tarjeta</label>
+                          <input
+                            type="text"
+                            value={cardNumber}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 16);
+                              setCardNumber(v.replace(/(.{4})/g, '$1 ').trim());
+                            }}
+                            placeholder="1234 5678 9012 3456"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Nombre en tarjeta</label>
+                          <input
+                            type="text"
+                            value={cardName}
+                            onChange={(e) => setCardName(e.target.value)}
+                            placeholder="JUAN PÉREZ"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Vencimiento</label>
+                            <input
+                              type="text"
+                              value={cardExpiry}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setCardExpiry(v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v);
+                              }}
+                              placeholder="MM/AA"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">CVV</label>
+                            <input
+                              type="password"
+                              value={cardCVV}
+                              onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="•••"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 text-center">Checkout de confirmación</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-gray-50 rounded-lg p-3 text-sm flex items-center gap-2">
+                          <CalendarIcon className="w-4 h-4 text-[#8B1538]" />
+                          <span className="text-gray-500">Inicio: </span>
+                          <span className="font-medium text-gray-900">{selectedPayment.dueDate}</span>
+                        </div>
+                        {selectedPayment.totalAmount && selectedRoomie && (
+                          <div className="bg-[#8B1538]/5 border border-[#8B1538]/20 rounded-lg p-3 text-sm flex justify-between items-center">
+                            <span className="text-gray-600">Tu parte:</span>
+                            <span className="font-bold text-[#8B1538] text-base">
+                              {getRoomieAmount(selectedPayment, selectedRoomie)}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Frecuencia</label>
+                          <div className="px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-700 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#8B1538] inline-block"></span>
+                            Bimestral
+                            <span className="text-xs text-gray-400">(del pago)</span>
+                          </div>
+                        </div>
+                        <DatePicker
+                          selectedDate={scheduledEndDate}
+                          onDateSelect={(date) => setScheduledEndDate(date)}
+                          label="Hasta cuándo pagar"
+                          minDate={new Date()}
+                        />
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Número de tarjeta</label>
+                          <input
+                            type="text"
+                            value={cardNumber}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 16);
+                              setCardNumber(v.replace(/(.{4})/g, '$1 ').trim());
+                            }}
+                            placeholder="1234 5678 9012 3456"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Vencimiento</label>
+                            <input
+                              type="text"
+                              value={cardExpiry}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setCardExpiry(v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v);
+                              }}
+                              placeholder="MM/AA"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">CVV</label>
+                            <input
+                              type="password"
+                              value={cardCVV}
+                              onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="•••"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-[#8B1538] outline-none"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 text-center">Checkout de confirmación</p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="px-6 py-4 border-t border-gray-100">
+                    <button
+                      onClick={confirmPayment}
+                      disabled={!cardNumber || !cardExpiry || !cardCVV || (paymentTab === 'programado' && !scheduledEndDate)}
+                      className="w-full py-3 bg-[#8B1538] text-white rounded-xl font-semibold hover:bg-[#6b0f2a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Completar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      }
 
       {/* Floating Add Button - Only for Propietario */}
-      {userType === 'propietario' && (
-        <button
-          onClick={() => {
-            resetForm();
-            setIsCreatePaymentOpen(true);
-          }}
-          className="absolute bottom-24 right-6 w-14 h-14 bg-[#8B1538] rounded-full flex items-center justify-center shadow-lg hover:bg-[#6b0f2a] transition-colors z-40"
-        >
-          <Plus className="w-7 h-7 text-white" strokeWidth={3} />
-        </button>
-      )}
+      {
+        userType === 'propietario' && (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsCreatePaymentOpen(true);
+            }}
+            className="absolute bottom-24 right-6 w-14 h-14 bg-[#8B1538] rounded-full flex items-center justify-center shadow-lg hover:bg-[#6b0f2a] transition-colors z-40"
+          >
+            <Plus className="w-7 h-7 text-white" strokeWidth={3} />
+          </button>
+        )
+      }
 
       {/* Bottom Navigation */}
       <BottomNavigation />
-    </div>
+    </div >
   );
 }
