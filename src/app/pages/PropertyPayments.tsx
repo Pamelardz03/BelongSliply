@@ -94,13 +94,13 @@ export function PropertyPayments() {
   const [isCreatePaymentOpen, setIsCreatePaymentOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   // Form states
   const [formName, setFormName] = useState('');
   const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
   const [formCategory, setFormCategory] = useState('');
   const [formStartDate, setFormStartDate] = useState('');
-  const [paymentAmount, setPaymentAmount] = useState<string | number>('');
   const [formEndDate, setFormEndDate] = useState('');
   const [formFrequency, setFormFrequency] = useState('');
   const [equalDistribution, setEqualDistribution] = useState(true);
@@ -943,48 +943,34 @@ export function PropertyPayments() {
                   )}
                 </div>
 
+
+
                 {/* Fechas */}
                 <div className="grid grid-cols-2 gap-3">
                   <DatePicker
                     selectedDate={formStartDate}
                     onDateSelect={(date) => setFormStartDate(date)}
                     label="Fecha Inicio:"
-                    minDate={new Date()}
+                    minDate={(() => {
+                      const oneMonthAgo = new Date();
+                      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                      return oneMonthAgo;
+                    })()}
                   />
                   <DatePicker
                     selectedDate={formEndDate}
                     onDateSelect={(date) => setFormEndDate(date)}
                     label="Fecha Fin:"
-                    minDate={formStartDate ? new Date(formStartDate) : new Date()}
+                    minDate={(() => {
+                      const oneMonthAgo = new Date();
+                      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                      return oneMonthAgo;
+                    })()}
                   />
                 </div>
 
-                {/* Monto del Pago (Nueva sección) */}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cantidad a cobrar:
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500 font-medium">$</span>
-                    <input
-                      type="number"
-                      value={paymentAmount} // Asegúrate de declarar este estado: const [paymentAmount, setPaymentAmount] = useState('');
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-2 border-2 border-gray-300 rounded-lg focus:border-[#8B1538] outline-none text-sm transition-colors font-medium"
-                    />
-                  </div>
-                  {/* Leyenda aclaratoria dinámica */}
-                  <p className="text-[10px] text-gray-500 mt-1 italic">
-                    {paymentAmount && formFrequency
-                      ? `Definiendo un cobro de $${paymentAmount} con frecuencia ${formFrequency.toLowerCase()}.`
-                      : "Define la cantidad y frecuencia para el cálculo de cobros."
-                    }
-                  </p>
-                </div>
-
                 {/* Frecuencia */}
-                <div className="mt-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Frecuencia:</label>
                   <select
                     value={formFrequency}
@@ -996,6 +982,32 @@ export function PropertyPayments() {
                       <option key={frequency} value={frequency}>{frequency}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Monto del Pago */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad a cobrar:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">💵</span> {/* Icono de monto para consistencia con el de abajo */}
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2 text-gray-500 font-medium">$</span>
+                      <input
+                        type="number"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-7 pr-3 py-2 border-2 border-gray-300 rounded-lg focus:border-[#8B1538] outline-none text-sm transition-colors font-medium"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1 italic">
+                    {paymentAmount && formFrequency
+                      ? `Cobro de $${paymentAmount} ${formFrequency.toLowerCase()}`
+                      : "Define el monto por cada periodo."
+                    }
+                  </p>
                 </div>
 
                 {/* Método de Pago */}
