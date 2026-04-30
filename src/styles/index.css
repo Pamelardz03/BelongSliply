@@ -12,7 +12,13 @@ body, html, #root {
 }
 
 #root {
+  background-color: #ffffff;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
+  
+  /* Opcional: si el contenido se tapa con la cámara, añade este padding */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
