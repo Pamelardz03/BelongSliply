@@ -14,6 +14,7 @@ interface Roomie {
   name: string;
   status: PaymentStatus;
   paidDate?: string;
+  percentage?: number;  // % asignado a este roomie
 }
 
 interface Payment {
@@ -23,6 +24,8 @@ interface Payment {
   dueDate: string;
   roomies: Roomie[];
   status: 'proximos' | 'completados' | 'atrasados';
+  totalAmount?: number;   // monto total del pago
+  frequency?: string;     // frecuencia (Mensual, Semanal, etc.)
 }
 
 const initialPaymentsData: Payment[] = [
@@ -151,13 +154,18 @@ export function PropertyPayments() {
 
     setSelectedResponsibles(responsibleIds);
 
-    // Pre-cargar distribución de porcentajes (por ahora 25% cada uno como ejemplo)
+    // Pre-cargar distribución de porcentajes desde los roomies guardados
     const initialDistributions: { [key: string]: number } = {};
-    const percentage = Math.floor(100 / responsibleIds.length);
-    const remainder = 100 - (percentage * responsibleIds.length);
-
     responsibleIds.forEach((id, index) => {
-      initialDistributions[id] = index === 0 ? percentage + remainder : percentage;
+      const person = registeredPeople.find(p => p.id === id);
+      const existingRoomie = payment.roomies.find(r => r.name === person?.name);
+      if (existingRoomie?.percentage !== undefined) {
+        initialDistributions[id] = existingRoomie.percentage;
+      } else {
+        const percentage = Math.floor(100 / responsibleIds.length);
+        const remainder = 100 - (percentage * responsibleIds.length);
+        initialDistributions[id] = index === 0 ? percentage + remainder : percentage;
+      }
     });
 
     setDistributions(initialDistributions);
@@ -168,8 +176,9 @@ export function PropertyPayments() {
     setFormStartDate('');
     setFormEndDate('');
 
-    // Pre-cargar frecuencia (por defecto Mensual como ejemplo)
-    setFormFrequency('Mensual');
+    // Pre-cargar frecuencia y monto guardados
+    setFormFrequency(payment.frequency || 'Mensual');
+    setPaymentAmount(payment.totalAmount ? String(payment.totalAmount) : '');
 
     // Pre-cargar método de pago
     setPaymentMethod('**** 1234');
@@ -318,11 +327,13 @@ export function PropertyPayments() {
   };
 
   const saveNewPayment = () => {
+    const amount = parseFloat(paymentAmount) || 0;
     const newRoomies: Roomie[] = selectedResponsibles.map(responsibleId => {
       const person = registeredPeople.find(p => p.id === responsibleId);
       return {
         name: person?.name || '',
         status: 'unpaid' as PaymentStatus,
+        percentage: distributions[responsibleId] || 0,
       };
     });
 
@@ -333,6 +344,8 @@ export function PropertyPayments() {
       dueDate: formStartDate ? new Date(formStartDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
       roomies: newRoomies,
       status: 'proximos',
+      totalAmount: amount,
+      frequency: formFrequency,
     };
 
     setPayments(prevPayments => [...prevPayments, newPayment]);
@@ -344,6 +357,7 @@ export function PropertyPayments() {
 
   const confirmEditPayment = (editType: 'once' | 'all') => {
     if (editingPaymentId !== null) {
+      const amount = parseFloat(paymentAmount) || 0;
       // Modo edición: actualizar el pago existente
       setPayments(prevPayments =>
         prevPayments.map(payment => {
@@ -357,6 +371,7 @@ export function PropertyPayments() {
                 name: person?.name || '',
                 status: existingRoomie?.status || 'unpaid',
                 paidDate: existingRoomie?.paidDate,
+                percentage: distributions[responsibleId] || 0,
               };
             });
 
@@ -365,7 +380,8 @@ export function PropertyPayments() {
               name: formName,
               category: formCategory,
               roomies: updatedRoomies,
-              // Mantener las fechas y otros campos según el formulario
+              totalAmount: amount,
+              frequency: formFrequency,
             };
           }
           return payment;
@@ -403,6 +419,13 @@ export function PropertyPayments() {
 
       setDistributions(newDistributions);
     }
+  };
+
+  const getRoomieAmount = (payment: Payment, roomie: Roomie): string => {
+    if (!payment.totalAmount || payment.totalAmount === 0) return '';
+    const pct = roomie.percentage ?? (100 / (payment.roomies.length || 1));
+    const amount = (payment.totalAmount * pct) / 100;
+    return `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const filteredPayments = activeFilter === 'todos'
@@ -684,6 +707,18 @@ export function PropertyPayments() {
                     </div>
                     <p className="text-sm text-[#8B1538] mt-0.5">{payment.category}</p>
                     <p className="text-xs text-gray-500 mt-1">Fecha Límite: {payment.dueDate}</p>
+                    {/* Monto: propietario ve total, roomie ve su parte */}
+                    {payment.totalAmount ? (
+                      <p className="text-sm font-semibold text-gray-800 mt-1">
+                        {userType === 'propietario'
+                          ? `$${payment.totalAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payment.frequency ? `/ ${payment.frequency}` : ''}`
+                          : (() => {
+                              const myRoomie = payment.roomies.find(r => r.name === userName);
+                              return myRoomie ? `${getRoomieAmount(payment, myRoomie)} ${payment.frequency ? `/ ${payment.frequency}` : ''}` : '';
+                            })()
+                        }
+                      </p>
+                    ) : null}
                   </div>
 
                   {/* Progress Circle */}
@@ -789,7 +824,15 @@ export function PropertyPayments() {
                         >
                           {roomie.name.charAt(0)}
                         </div>
-                        <span className="font-medium text-gray-900">{roomie.name}</span>
+                        <div>
+                          <span className="font-medium text-gray-900 block">{roomie.name}</span>
+                          {selectedPayment.totalAmount ? (
+                            <span className="text-xs text-[#8B1538] font-semibold">
+                              {getRoomieAmount(selectedPayment, roomie)}
+                              {roomie.percentage !== undefined ? ` (${roomie.percentage}%)` : ''}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <span
                         className={`text-sm ${roomie.status === 'paid'
@@ -1258,6 +1301,15 @@ export function PropertyPayments() {
                 <span className="text-sm text-gray-600">Categoría:</span>
                 <span className="text-sm font-medium text-[#8B1538]">{selectedPayment.category}</span>
               </div>
+              {selectedPayment.totalAmount ? (
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Tu parte:</span>
+                  <span className="text-sm font-bold text-[#8B1538]">
+                    {getRoomieAmount(selectedPayment, selectedRoomie)}
+                    {selectedRoomie.percentage !== undefined ? ` (${selectedRoomie.percentage}%)` : ''}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Fecha límite:</span>
                 <span className="text-sm font-medium text-gray-900">{selectedPayment.dueDate}</span>
@@ -1290,6 +1342,11 @@ export function PropertyPayments() {
               <div>
                 <h2 className="font-bold text-lg text-gray-900">{selectedPayment.name}</h2>
                 <p className="text-sm text-[#8B1538]">{selectedPayment.category}</p>
+                {selectedPayment.totalAmount ? (
+                  <p className="text-base font-bold text-gray-900 mt-0.5">
+                    {getRoomieAmount(selectedPayment, selectedRoomie)}
+                  </p>
+                ) : null}
               </div>
               <button onClick={closeCheckout} className="p-1 hover:bg-gray-100 rounded-full">
                 <X className="w-5 h-5 text-gray-500" />
